@@ -182,7 +182,7 @@ In one sentence: what does numerical instability represent physically?
 Upload to the course portal before the deadline:
 
 1. **Source files:**
-   - `ex_w3_2.cu` (matrix addition kernel)
+   - `01_2d_indexing.cu` (matrix addition kernel)
    - `02_blur.cu` (modified with 3×3 blur)
    - `03_heat_diffusion.cu` (modified with two hot spots)
 
