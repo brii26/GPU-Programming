@@ -61,7 +61,7 @@ If this runs successfully, your CUDA environment is ready. Proceed to the exerci
 ./01_2d_indexing
 ```
 
-**Questions** (answer in comments in your code or in `report_week3_4.txt`):
+**Questions** (answer in comments in your code or in `report_week3_4_NIM.docx`):
 1. For a matrix of size 5×7 with block size (4,4), what is the grid dimension? Calculate manually before running.
 2. In Demo 1, why do some block/thread combos not appear in the output even though they were launched?
 3. What does `flat_idx = row * width + col` mean? Draw it on paper for a 3×4 matrix.
@@ -186,7 +186,7 @@ Upload to the course portal before the deadline:
    - `02_blur.cu` (modified with 3×3 blur)
    - `03_heat_diffusion.cu` (modified with two hot spots)
 
-2. **Report** `report_week3_4.txt`:
+2. **Report** `report_week3_4_NIM.docx`:
    - Answers to all numbered **Questions** above
    - Your measured results from W3-4 Part B (grid size vs GPU time table)
    - One paragraph: what was the most surprising result today, and why?
