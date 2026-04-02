@@ -278,9 +278,9 @@ int main() {
         double cpu_time = 0.0;
         if (M <= 1024) {
             for (int run = 0; run < num_runs; run++) {
-                timer_start();
+                struct timespec ts = cpu_timer_start();
                 matmul_cpu(A_h, B_h, C_cpu, M, K, N);
-                cpu_time += timer_end_ms();
+                cpu_time += cpu_timer_stop(ts);
             }
             cpu_time /= num_runs;
         } else {
@@ -291,18 +291,18 @@ int main() {
         // Run basic GPU benchmark
         double basic_gpu_time = 0.0;
         for (int run = 0; run < num_runs; run++) {
-            timer_start();
+            struct timespec ts_b = cpu_timer_start();
             matmul_gpu_basic(A_h, B_h, C_basic, M, K, N);
-            basic_gpu_time += timer_end_ms();
+            basic_gpu_time += cpu_timer_stop(ts_b);
         }
         basic_gpu_time /= num_runs;
 
         // Run tiled GPU benchmark
         double tiled_gpu_time = 0.0;
         for (int run = 0; run < num_runs; run++) {
-            timer_start();
+            struct timespec ts_t = cpu_timer_start();
             matmul_gpu_tiled(A_h, B_h, C_tiled, M, K, N);
-            tiled_gpu_time += timer_end_ms();
+            tiled_gpu_time += cpu_timer_stop(ts_t);
         }
         tiled_gpu_time /= num_runs;
 
@@ -370,13 +370,13 @@ int main() {
     matmul_gpu_tiled(A_h, B_h, C, M, K, N);
 
     // Timed runs for GFLOPS
-    timer_start();
+    struct timespec ts1 = cpu_timer_start();
     matmul_gpu_basic(A_h, B_h, C, M, K, N);
-    double basic_time = timer_end_ms();
+    double basic_time = cpu_timer_stop(ts1);
 
-    timer_start();
+    struct timespec ts2 = cpu_timer_start();
     matmul_gpu_tiled(A_h, B_h, C, M, K, N);
-    double tiled_time = timer_end_ms();
+    double tiled_time = cpu_timer_stop(ts2);
 
     double basic_gflops = compute_gflops(M, K, N, basic_time);
     double tiled_gflops = compute_gflops(M, K, N, tiled_time);

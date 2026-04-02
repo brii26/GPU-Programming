@@ -16,8 +16,16 @@
 // ============================================================
 __global__ void matmul_basic_kernel(float *A, float *B, float *C,
                                      int M, int K, int N) {
-    // YOUR CODE HERE
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
 
+    if (row < M && col < N) {
+        float sum = 0.0f;
+        for (int k = 0; k < K; k++) {
+            sum += A[row * K + k] * B[k * N + col];
+        }
+        C[row * N + col] = sum;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -50,22 +58,25 @@ int main(int argc, char *argv[]) {
     // Size in bytes: rows * cols * sizeof(float)
     // ============================================================
     float *d_A, *d_B, *d_C;
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMalloc(&d_A, M * K * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B, K * N * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_C, M * N * sizeof(float)));
 
     // ============================================================
     // TODO 3: Copy A and B from host to device
     // Use: CUDA_CHECK(cudaMemcpy(..., cudaMemcpyHostToDevice))
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMemcpy(d_A, A.data, M * K * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, B.data, K * N * sizeof(float), cudaMemcpyHostToDevice));
 
     // ============================================================
     // TODO 4: Set up grid and block dimensions
     // Hint: Use 16x16 thread blocks
     // Calculate gridDim as (M + blockDim.x - 1) / blockDim.x
     // ============================================================
-    // dim3 blockDim(...);
-    // dim3 gridDim(...);
-    // YOUR CODE HERE
+    dim3 blockSize(16, 16);
+    dim3 gridSize((N + blockSize.x - 1) / blockSize.x,
+                  (M + blockSize.y - 1) / blockSize.y);
 
     // ============================================================
     // TODO 5: Launch the kernel and measure time
@@ -74,7 +85,7 @@ int main(int argc, char *argv[]) {
     GpuTimer timer;
     gpu_timer_start(&timer);
 
-    // YOUR CODE HERE - launch kernel
+    matmul_basic_kernel<<<gridSize, blockSize>>>(d_A, d_B, d_C, M, K, N);
 
     float gpu_time = gpu_timer_stop(&timer);
     CUDA_CHECK(cudaGetLastError());
@@ -86,7 +97,7 @@ int main(int argc, char *argv[]) {
     // TODO 6: Copy result C from device to host
     // Use: CUDA_CHECK(cudaMemcpy(C.data, d_C, ..., cudaMemcpyDeviceToHost))
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMemcpy(C.data, d_C, M * N * sizeof(float), cudaMemcpyDeviceToHost));
 
     // Verify result
     if (argc >= 4) {
@@ -97,9 +108,9 @@ int main(int argc, char *argv[]) {
     } else {
         // Compare with CPU result
         printf("Computing CPU reference...\n");
-        double cpu_start = cpu_timer_start();
+        struct timespec cpu_start = cpu_timer_start();
         Matrix C_cpu = matrix_multiply_cpu(&A, &B);
-        double cpu_time = cpu_timer_stop(cpu_start);
+        float cpu_time = cpu_timer_stop(cpu_start);
         printf("CPU Time: %.3f ms\n", cpu_time);
 
         int pass = matrix_compare(&C, &C_cpu, 1e-3);
@@ -116,7 +127,9 @@ int main(int argc, char *argv[]) {
     // TODO 7: Free device memory
     // Use: CUDA_CHECK(cudaFree(...))
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaFree(d_A));
+    CUDA_CHECK(cudaFree(d_B));
+    CUDA_CHECK(cudaFree(d_C));
 
     matrix_free(&A);
     matrix_free(&B);

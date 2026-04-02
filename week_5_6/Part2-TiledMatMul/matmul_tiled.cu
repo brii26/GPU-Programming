@@ -38,8 +38,41 @@
 // ============================================================
 __global__ void matmul_tiled_kernel(float *A, float *B, float *C,
                                      int M, int K, int N) {
-    // YOUR CODE HERE
+    __shared__ float As[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float Bs[TILE_WIDTH][TILE_WIDTH];
 
+    int row = blockIdx.y * TILE_WIDTH + threadIdx.y;
+    int col = blockIdx.x * TILE_WIDTH + threadIdx.x;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    float sum = 0.0f;
+    int num_phases = (K + TILE_WIDTH - 1) / TILE_WIDTH;
+
+    for (int t = 0; t < num_phases; t++) {
+        // Load A tile
+        if (row < M && t * TILE_WIDTH + tx < K)
+            As[ty][tx] = A[row * K + t * TILE_WIDTH + tx];
+        else
+            As[ty][tx] = 0.0f;
+
+        // Load B tile
+        if (t * TILE_WIDTH + ty < K && col < N)
+            Bs[ty][tx] = B[(t * TILE_WIDTH + ty) * N + col];
+        else
+            Bs[ty][tx] = 0.0f;
+
+        __syncthreads();
+
+        // Partial dot product
+        for (int k = 0; k < TILE_WIDTH; k++)
+            sum += As[ty][k] * Bs[k][tx];
+
+        __syncthreads();
+    }
+
+    if (row < M && col < N)
+        C[row * N + col] = sum;
 }
 
 // Basic kernel for comparison (non-tiled)
@@ -86,20 +119,24 @@ int main(int argc, char *argv[]) {
     // TODO 2: Allocate device memory for A, B, C
     // ============================================================
     float *d_A, *d_B, *d_C_tiled, *d_C_basic;
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMalloc(&d_A, M * K * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B, K * N * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_C_tiled, M * N * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_C_basic, M * N * sizeof(float)));
 
     // ============================================================
     // TODO 3: Copy A and B from host to device
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMemcpy(d_A, A.data, M * K * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, B.data, K * N * sizeof(float), cudaMemcpyHostToDevice));
 
     // ============================================================
     // TODO 4: Set up grid and block dimensions
     // Use TILE_WIDTH for block dimensions (TILE_WIDTH x TILE_WIDTH)
     // ============================================================
     dim3 blockDim(TILE_WIDTH, TILE_WIDTH);
-    // dim3 gridDim(...);
-    // YOUR CODE HERE
+    dim3 gridDim((N + TILE_WIDTH - 1) / TILE_WIDTH,
+                 (M + TILE_WIDTH - 1) / TILE_WIDTH);
 
     printf("Grid: (to be calculated), Block: %d x %d\n", blockDim.x, blockDim.y);
 
@@ -110,7 +147,7 @@ int main(int argc, char *argv[]) {
     GpuTimer timer_basic;
     gpu_timer_start(&timer_basic);
 
-    // YOUR CODE HERE - launch basic kernel
+    matmul_basic_kernel<<<gridDim, blockDim>>>(d_A, d_B, d_C_basic, M, K, N);
 
     float gpu_time_basic = gpu_timer_stop(&timer_basic);
     CUDA_CHECK(cudaGetLastError());
@@ -125,7 +162,7 @@ int main(int argc, char *argv[]) {
     GpuTimer timer_tiled;
     gpu_timer_start(&timer_tiled);
 
-    // YOUR CODE HERE - launch tiled kernel
+    matmul_tiled_kernel<<<gridDim, blockDim>>>(d_A, d_B, d_C_tiled, M, K, N);
 
     float gpu_time_tiled = gpu_timer_stop(&timer_tiled);
     CUDA_CHECK(cudaGetLastError());
@@ -137,7 +174,8 @@ int main(int argc, char *argv[]) {
     // TODO 6: Copy results C from device to host
     // Copy both C_tiled and C_basic
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMemcpy(C_tiled.data, d_C_tiled, M * N * sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(C_basic.data, d_C_basic, M * N * sizeof(float), cudaMemcpyDeviceToHost));
 
     // Performance comparison
     printf("\n=== Performance Analysis ===\n");
@@ -155,9 +193,9 @@ int main(int argc, char *argv[]) {
     } else {
         // Compare with CPU result
         printf("Computing CPU reference...\n");
-        double cpu_start = cpu_timer_start();
+        struct timespec cpu_start = cpu_timer_start();
         Matrix C_cpu = matrix_multiply_cpu(&A, &B);
-        double cpu_time = cpu_timer_stop(cpu_start);
+        float cpu_time = cpu_timer_stop(cpu_start);
         printf("CPU Time: %.3f ms\n", cpu_time);
 
         int pass_tiled = matrix_compare(&C_tiled, &C_cpu, 1e-3);
@@ -176,7 +214,10 @@ int main(int argc, char *argv[]) {
     // ============================================================
     // TODO 7: Free device memory
     // ============================================================
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaFree(d_A));
+    CUDA_CHECK(cudaFree(d_B));
+    CUDA_CHECK(cudaFree(d_C_tiled));
+    CUDA_CHECK(cudaFree(d_C_basic));
 
     matrix_free(&A);
     matrix_free(&B);
