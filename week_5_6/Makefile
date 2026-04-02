@@ -183,24 +183,50 @@ solutions:
 	fi
 
 # ============================================================================
-# Test Target: Run basic tests
+# Test Target: Run all dataset combinations with basic & tiled, then benchmark
 # ============================================================================
-test: part1 part2
+# Dataset definitions
+SMALL_SETS  := 64x64 100x100 128x128
+MEDIUM_SETS := 256x256 256x512 500x500 512x512
+LARGE_SETS  := 1024x1024 2048x2048
+
+test: part1 part2 part3
 	@echo ""
 	@echo "$(BLUE)==============================================================$(NC)"
-	@echo "$(BLUE)  Running Tests$(NC)"
+	@echo "$(BLUE)  Running All Tests$(NC)"
 	@echo "$(BLUE)==============================================================$(NC)"
 	@echo ""
-
-	@echo "$(YELLOW)[TEST]$(NC) Part 1: Basic GPU implementation"
-	@./$(PART1_EXE) datasets/small/mat_128x128_A.bin datasets/small/mat_128x128_B.bin datasets/small/mat_128x128_C.bin 2>&1 | head -20
+	@echo "$(BLUE)--- SMALL DATASETS ---$(NC)"
+	@for size in $(SMALL_SETS); do \
+		echo "$(YELLOW)[BASIC  | small/$$size]$(NC)"; \
+		./$(PART1_EXE) datasets/small/mat_$${size}_A.bin datasets/small/mat_$${size}_B.bin datasets/small/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+		echo "$(YELLOW)[TILED  | small/$$size]$(NC)"; \
+		./$(PART2_EXE) datasets/small/mat_$${size}_A.bin datasets/small/mat_$${size}_B.bin datasets/small/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+	done
+	@echo "$(BLUE)--- MEDIUM DATASETS ---$(NC)"
+	@for size in $(MEDIUM_SETS); do \
+		echo "$(YELLOW)[BASIC  | medium/$$size]$(NC)"; \
+		./$(PART1_EXE) datasets/medium/mat_$${size}_A.bin datasets/medium/mat_$${size}_B.bin datasets/medium/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+		echo "$(YELLOW)[TILED  | medium/$$size]$(NC)"; \
+		./$(PART2_EXE) datasets/medium/mat_$${size}_A.bin datasets/medium/mat_$${size}_B.bin datasets/medium/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+	done
+	@echo "$(BLUE)--- LARGE DATASETS ---$(NC)"
+	@for size in $(LARGE_SETS); do \
+		echo "$(YELLOW)[BASIC  | large/$$size]$(NC)"; \
+		./$(PART1_EXE) datasets/large/mat_$${size}_A.bin datasets/large/mat_$${size}_B.bin datasets/large/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+		echo "$(YELLOW)[TILED  | large/$$size]$(NC)"; \
+		./$(PART2_EXE) datasets/large/mat_$${size}_A.bin datasets/large/mat_$${size}_B.bin datasets/large/mat_$${size}_C.bin 2>&1 | head -10; \
+		echo ""; \
+	done
+	@echo "$(BLUE)--- BENCHMARK (Part 3) ---$(NC)"
+	@./$(PART3_EXE)
 	@echo ""
-
-	@echo "$(YELLOW)[TEST]$(NC) Part 2: Tiled GPU implementation"
-	@./$(PART2_EXE) datasets/small/mat_128x128_A.bin datasets/small/mat_128x128_B.bin datasets/small/mat_128x128_C.bin 2>&1 | head -20
-	@echo ""
-
-	@echo "$(GREEN)[OK]$(NC) Tests completed"
+	@echo "$(GREEN)[OK]$(NC) All tests completed"
 	@echo ""
 
 # ============================================================================
