@@ -20,6 +20,16 @@ where `ky` and `kx` iterate from 0 to K-1.
 
 Pixels outside the image boundary are treated as zero (zero-padding). The filter F is small (typically 3×3, 5×5, or 7×7), read-only, and accessed by every thread, making it a prime candidate for constant memory.
 
+### How Convolution Works
+
+The animation below shows the filter sliding across the input image, computing one output pixel at each position:
+
+![Convolution Animation](images/convolution-illustration.gif)
+
+The diagram below breaks down the full process — how a single output pixel is computed from element-wise products, how the filter slides to produce the full output, and why the tiled shared memory approach dramatically reduces global memory accesses compared to the naive approach:
+
+![Convolution Explained](images/convolution_explained.png)
+
 ## 3. Project Structure (3 Parts)
 
 ### Part 1: Naive Global Memory Kernel (25 points)
