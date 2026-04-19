@@ -36,18 +36,25 @@ __global__
 void convNaiveKernel(const float *input, const float *filter, float *output,
                      int height, int width, int filterSize) {
 
-    // Step 1: Calculate which output pixel (row, col) this thread is
-    //         responsible for, using block and thread indices.
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // Step 2: If (row, col) is outside the image, return immediately.
+    if (row >= height || col >= width) return;
 
-    // Step 3: Apply the convolution formula from the Background section.
-    //         Loop over the K×K filter, find the corresponding input pixel,
-    //         and accumulate the weighted sum. Use zero-padding for
-    //         input positions that fall outside the image boundary.
+    int half = filterSize / 2;
+    float sum = 0.0f;
 
-    // Step 4: Write the accumulated result to the output image.
+    for (int fy = 0; fy < filterSize; fy++) {
+        for (int fx = 0; fx < filterSize; fx++) {
+            int inRow = row - half + fy;
+            int inCol = col - half + fx;
+            if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width) {
+                sum += filter[fy * filterSize + fx] * input[inRow * width + inCol];
+            }
+        }
+    }
 
+    output[row * width + col] = sum;
 }
 
 // ============================================================

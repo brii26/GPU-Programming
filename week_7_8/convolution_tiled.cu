@@ -45,38 +45,51 @@ void convTiledKernel(const float *input, const float *filter, float *output,
                      int height, int width, int filterSize) {
 
     int half = filterSize / 2;
-
-    // Shared memory tile dimensions (provided as a hint)
     int sharedWidth = TILE_SIZE + filterSize - 1;
 
-    // Step 1: Declare a 2D shared memory array large enough to hold
-    //         the input tile plus its halo region.
-    //         Think: how big must it be in each dimension?
+    // Step 1: Shared memory tile sized for worst-case filter (MAX_FILTER_SIZE).
+    //         Only [sharedWidth x sharedWidth] elements are used at runtime.
+    __shared__ float tile[TILE_SIZE + MAX_FILTER_SIZE - 1][TILE_SIZE + MAX_FILTER_SIZE - 1];
 
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
 
-    // Step 2: Identify this thread's position within the block,
-    //         and compute where this tile's input region starts
-    //         in the global image. Remember the input region is
-    //         shifted by -half relative to the output region.
+    // Step 2: Top-left corner of the input region this block needs.
+    //         Offset by -half so the halo is included.
+    int inStartRow = blockIdx.y * TILE_SIZE - half;
+    int inStartCol = blockIdx.x * TILE_SIZE - half;
 
+    // Step 3: Cooperatively load shared memory using a strided loop.
+    //         sharedWidth x sharedWidth > TILE_SIZE x TILE_SIZE, so each
+    //         thread may load more than one element.
+    for (int i = ty; i < sharedWidth; i += TILE_SIZE) {
+        for (int j = tx; j < sharedWidth; j += TILE_SIZE) {
+            int globalRow = inStartRow + i;
+            int globalCol = inStartCol + j;
+            if (globalRow >= 0 && globalRow < height && globalCol >= 0 && globalCol < width)
+                tile[i][j] = input[globalRow * width + globalCol];
+            else
+                tile[i][j] = 0.0f;  // zero-pad out-of-bounds
+        }
+    }
 
-    // Step 3: Cooperatively load the shared memory tile from global memory.
-    //         Challenge: the shared tile has more elements than there are
-    //         threads in the block (e.g., 20x20 = 400 elements but only
-    //         16x16 = 256 threads). You need a strategy to cover all elements.
-    //         Also handle boundary conditions: what value should you store
-    //         for positions that fall outside the image?
+    // Step 4: Wait until all threads have finished loading shared memory
+    //         before any thread reads from it for computation.
+    __syncthreads();
 
+    // Step 5: Each thread computes one output pixel from shared memory.
+    int outRow = blockIdx.y * TILE_SIZE + ty;
+    int outCol = blockIdx.x * TILE_SIZE + tx;
 
-    // Step 4: Synchronize all threads in the block.
-    //         Why is this necessary before proceeding to computation?
-
-
-    // Step 5: Each thread computes one output pixel by convolving the
-    //         filter with the appropriate region of shared memory.
-    //         Check that the output position is within image bounds
-    //         before writing the result.
-
+    if (outRow < height && outCol < width) {
+        float sum = 0.0f;
+        for (int fy = 0; fy < filterSize; fy++) {
+            for (int fx = 0; fx < filterSize; fx++) {
+                sum += filter[fy * filterSize + fx] * tile[ty + fy][tx + fx];
+            }
+        }
+        output[outRow * width + outCol] = sum;
+    }
 }
 
 // ============================================================
